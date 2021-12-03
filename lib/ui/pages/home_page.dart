@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_avanzado/data/models/bands.dart';
 
+// ignore: must_be_immutable
 class HomePage extends StatelessWidget {
   HomePage({Key? key}) : super(key: key);
   List<Band> list = [
