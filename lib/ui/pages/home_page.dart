@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_avanzado/controller/home_controller.dart';
+import 'package:flutter_avanzado/data/services/sockets_services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_avanzado/data/models/bands.dart';
+import 'package:pie_chart/pie_chart.dart';
 
 // ignore: must_be_immutable
-class HomePage extends StatelessWidget {
-  HomePage({Key? key}) : super(key: key);
-  List<Band> list = [
-    Band(id: '1', name: 'Rock Lee', votes: 10),
-    Band(id: '2', name: 'Metal fusion', votes: 2),
-    Band(id: '3', name: 'Dynamoc Roc', votes: 5),
-  ].obs;
+class HomePage extends GetView<HomeController> {
+  const HomePage({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -22,11 +21,39 @@ class HomePage extends StatelessWidget {
         centerTitle: true,
         elevation: 1,
         backgroundColor: Colors.white,
+        actions: [
+          Obx(
+            () => Container(
+              margin: const EdgeInsets.only(right: 10.0),
+              child: (SocketsService.to.serverStatus == 'Conectado')
+                  ? const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                    )
+                  : const Icon(
+                      Icons.offline_bolt,
+                      color: Colors.red,
+                    ),
+            ),
+          )
+        ],
       ),
-      body: Obx(
-        () => ListView.builder(
-            itemCount: list.length,
-            itemBuilder: (_, i) => _ModelCard(band: list[i])),
+      body: SizedBox(
+        height: double.infinity,
+        width: double.infinity,
+        child: Column(
+          children: [
+            Obx(() => grafica()),
+            Expanded(
+              child: Obx(
+                () => ListView.builder(
+                  itemCount: controller.list.length,
+                  itemBuilder: (_, i) => _ModelCard(band: controller.list[i]),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -65,11 +92,21 @@ class HomePage extends StatelessWidget {
 
   addBandToList(String name) {
     if (name.length > 1) {
-      list.add(
-        Band(name: name, id: DateTime.now().toString(), votes: 0),
-      );
+      SocketsService.to.socket.emit('add-band', {"name": name});
     }
     Get.back();
+  }
+
+  Widget grafica() {
+    Map<String, double> myMap = {};
+    controller.list.forEach((band) {
+      myMap.putIfAbsent(band.name.toString(), () => band.votes.toDouble());
+    });
+    return SizedBox(
+      height: 200,
+      width: double.infinity,
+      child: PieChart(dataMap: myMap),
+    );
   }
 }
 
@@ -78,12 +115,32 @@ class _ModelCard extends StatelessWidget {
   final Band band;
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(
-        child: Text(band.name!.substring(0, 2)),
+    return Dismissible(
+      key: Key(band.id.toString()),
+      onDismissed: (value) {
+        SocketsService.to.socket.emit('delete-band', {"id": band.id});
+      },
+      direction: DismissDirection.startToEnd,
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20.0),
+        color: Colors.red,
+        child: const Text(
+          'Borrar Banda',
+          style: TextStyle(color: Colors.white),
+        ),
       ),
-      title: Text('${band.name}'),
-      trailing: Text('${band.votes} '),
+      child: ListTile(
+        leading: CircleAvatar(
+          child: Text(band.name.substring(0, 2)),
+        ),
+        title: Text(band.name),
+        trailing: Text('${band.votes}'),
+        onTap: () {
+          //Votar por una banda
+          SocketsService.to.socket.emit('votes-band', {"id": band.id});
+        },
+      ),
     );
   }
 }
